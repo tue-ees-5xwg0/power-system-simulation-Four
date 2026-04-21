@@ -7,7 +7,8 @@ name = "power-system-simulation"
 authors = [{name = "TU/e EES group"},
 { name = "S. Wessel", email = "s.b.wessel@student.tue.nl" }, 
 {name = "L van den Broek", email = "luukvandenbroek04@gmail.com" }, 
-{name = "P. Scholten", email = "p.a.w.scholten@student.tue.nl"}
+{name = "P. Scholten", email = "p.a.w.scholten@student.tue.nl"},
+{name = "B. van de Luijtgaarde", email = "b.f.a.v.d.luijtgaarde@student.tue.nl"}
 ]
 description = "Student project for power system simulation"
 readme = "README.md"
