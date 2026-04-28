@@ -57,6 +57,7 @@ class GraphProcessor:
             5. source_vertex_id should be a valid vertex id. (IDNotFoundError)
             6. The graph should be fully connected. (GraphNotFullyConnectedError)
             7. The graph should not contain cycles. (GraphCycleError)
+        
         If one certain condition is not satisfied, the error in the parentheses should be raised.
 
         Args:
@@ -68,7 +69,23 @@ class GraphProcessor:
             source_vertex_id: vertex id of the source in the graph
         """
         # put your implementation here
-        pass
+        self.vertex_ids = vertex_ids
+        self.edge_ids = edge_ids
+        self.edge_vertex_id_pairs = edge_vertex_id_pairs
+        self.edge_enabled = edge_enabled
+        self.source = source_vertex_id
+
+        if len(vertex_ids) != len(set(vertex_ids)):
+            raise IDNotUniqueError()
+
+        if len(edge_ids) != len(set(edge_ids)):
+            raise IDNotUniqueError()
+
+        if len(edge_ids) != len(edge_vertex_id_pairs):
+            raise InputLengthDoesNotMatchError()
+
+        if len(edge_ids) != len(edge_enabled):
+            raise InputLengthDoesNotMatchError()
 
     def find_downstream_vertices(self, edge_id: int) -> list[int]:
         """
