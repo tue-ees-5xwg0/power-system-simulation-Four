@@ -1,4 +1,4 @@
-from graph_processing import GraphProcessor
+from assigmnent_1.graph_processing import GraphProcessor
 
 gp = GraphProcessor(
     vertex_ids=[0, 1, 2],
