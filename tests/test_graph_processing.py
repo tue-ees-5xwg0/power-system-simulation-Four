@@ -1,8 +1,4 @@
-import os
-import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from assigmnent_1.graph_processing import GraphProcessor
+from power_system_simulation.graph_processing import GraphProcessor
 
 gp = GraphProcessor(
     vertex_ids=[0, 1, 2],
