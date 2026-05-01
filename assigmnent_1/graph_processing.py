@@ -57,7 +57,6 @@ class GraphProcessor:
             5. source_vertex_id should be a valid vertex id. (IDNotFoundError)
             6. The graph should be fully connected. (GraphNotFullyConnectedError)
             7. The graph should not contain cycles. (GraphCycleError)
-        
         If one certain condition is not satisfied, the error in the parentheses should be raised.
 
         Args:
