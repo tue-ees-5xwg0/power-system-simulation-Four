@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from power_grid_model.utils import json_deserialize
+from power_grid_model.validation import ValidationException
 
 from power_system_simulation.power_grid_calculation import PowerGridCalculation, ProfileDoesNotMatchError
 
@@ -66,3 +67,12 @@ def test_mismatched_load_ids(pgm_data, active, reactive):
 def test_invalid_input_data(active, reactive):
     with pytest.raises((KeyError, TypeError, ValueError)):
         PowerGridCalculation({"node": [], "line": []}, active, reactive)
+
+
+def test_invalid_batch_data(pgm_data, active, reactive):
+    bad_active = active.copy()
+    bad_reactive = reactive.copy()
+    bad_active.columns = [999, 998, 997]
+    bad_reactive.columns = [999, 998, 997]
+    with pytest.raises(ValidationException):
+        PowerGridCalculation(pgm_data, bad_active, bad_reactive)
