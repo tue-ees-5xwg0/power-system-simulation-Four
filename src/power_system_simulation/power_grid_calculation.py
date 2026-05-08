@@ -37,12 +37,15 @@ class PowerGridCalculation:
         max_i = np.argmax(u_pu, axis=1)
         min_i = np.argmin(u_pu, axis=1)
 
-        return pd.DataFrame({
-            "Max_Voltage": u_pu[n, max_i],
-            "Max_Voltage_Node": node_ids[max_i],
-            "Min_Voltage": u_pu[n, min_i],
-            "Min_Voltage_Node": node_ids[min_i],
-        }, index=self._timestamps)
+        return pd.DataFrame(
+            {
+                "Max_Voltage": u_pu[n, max_i],
+                "Max_Voltage_Node": node_ids[max_i],
+                "Min_Voltage": u_pu[n, min_i],
+                "Min_Voltage_Node": node_ids[min_i],
+            },
+            index=self._timestamps,
+        )
 
     def line_table(self):
         line_ids = self._output["line"]["id"][0]
@@ -56,10 +59,13 @@ class PowerGridCalculation:
         max_i = np.argmax(loading, axis=0)
         min_i = np.argmin(loading, axis=0)
 
-        return pd.DataFrame({
-            "Total_Loss": energy_kwh,
-            "Max_Loading": loading[max_i, np.arange(n)],
-            "Max_Loading_Timestamp": self._timestamps[max_i],
-            "Min_Loading": loading[min_i, np.arange(n)],
-            "Min_Loading_Timestamp": self._timestamps[min_i],
-        }, index=line_ids)
+        return pd.DataFrame(
+            {
+                "Total_Loss": energy_kwh,
+                "Max_Loading": loading[max_i, np.arange(n)],
+                "Max_Loading_Timestamp": self._timestamps[max_i],
+                "Min_Loading": loading[min_i, np.arange(n)],
+                "Min_Loading_Timestamp": self._timestamps[min_i],
+            },
+            index=line_ids,
+        )
