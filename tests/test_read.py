@@ -4,7 +4,7 @@ from power_system_simulation.pgm_processing import (
     create_pgm,
     read_load_profile,
     read_pgm_json,
-    velidate_load_profile,
+    validate_load_profile,
 )
 
 
@@ -28,7 +28,7 @@ print(active_profile.columns)
 def test_create_load_batch_update():
     active_profile = read_load_profile("data/active_power_profile.parquet")
     reactive_profile = read_load_profile("data/reactive_power_profile.parquet")
-    velidate_load_profile(active_profile, reactive_profile)
+    validate_load_profile(active_profile, reactive_profile)
 
     batch_update = create_load_batch_update(active_profile, reactive_profile)
 

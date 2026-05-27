@@ -15,15 +15,14 @@ def create_pgm(input_data):
 def read_load_profile(file_path):
     return pd.read_parquet(file_path)
 
-def velidate_load_profile(active_profile, reactive_profile):
+def validate_load_profile(active_profile, reactive_profile):
     if not active_profile.index.equals(reactive_profile.index):
         raise ValueError("Active and reactive profiles must have the same index.")
     if not active_profile.columns.equals(reactive_profile.columns):
         raise ValueError("Active and reactive profiles must have the same columns.")
 
 def create_load_batch_update(active_profile, reactive_profile):
-    velidate_load_profile(active_profile, reactive_profile)
-    load_ids = active_profile.columns.to_numpy()
+    validate_load_profile(active_profile, reactive_profile)
 
     return {
         ComponentType.sym_load: {
