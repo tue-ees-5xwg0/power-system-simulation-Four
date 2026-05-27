@@ -9,10 +9,10 @@ from power_system_simulation.pgm_processing import (
 
 
 def test_read_pgm_json():
-
     result = read_pgm_json("data/input_network_data.json")
 
     assert result is not None
+
 
 input_data = read_pgm_json("data/input_network_data.json")
 model = create_pgm(input_data)
@@ -24,6 +24,7 @@ active_profile = read_load_profile("data/active_power_profile.parquet")
 print(active_profile)
 print(active_profile.index)
 print(active_profile.columns)
+
 
 def test_create_load_batch_update():
     active_profile = read_load_profile("data/active_power_profile.parquet")

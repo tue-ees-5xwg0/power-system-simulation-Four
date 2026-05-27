@@ -1,25 +1,34 @@
 from pathlib import Path
 
 import pandas as pd
-from power_grid_model import ComponentType, PowerGridModel
-from power_grid_model.utils import json_deserialize
+
+try:
+    from power_grid_model import ComponentType, PowerGridModel
+    from power_grid_model.utils import json_deserialize
+except ImportError:
+    from .power_grid_model import ComponentType, PowerGridModel
+    from .power_grid_model.utils import json_deserialize
 
 
 def read_pgm_json(file_path):
     data = Path(file_path).read_text()
     return json_deserialize(data)
 
+
 def create_pgm(input_data):
     return PowerGridModel(input_data)
 
+
 def read_load_profile(file_path):
     return pd.read_parquet(file_path)
+
 
 def validate_load_profile(active_profile, reactive_profile):
     if not active_profile.index.equals(reactive_profile.index):
         raise ValueError("Active and reactive profiles must have the same index.")
     if not active_profile.columns.equals(reactive_profile.columns):
         raise ValueError("Active and reactive profiles must have the same columns.")
+
 
 def create_load_batch_update(active_profile, reactive_profile):
     validate_load_profile(active_profile, reactive_profile)
@@ -31,5 +40,3 @@ def create_load_batch_update(active_profile, reactive_profile):
             "q_specified": reactive_profile.to_numpy(),
         }
     }
-
-
