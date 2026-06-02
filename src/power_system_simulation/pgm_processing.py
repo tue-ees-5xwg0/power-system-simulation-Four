@@ -73,3 +73,30 @@ def aggregate_node_voltage_results(results, time_index):
             }
         )
     return pd.DataFrame(rows).set_index("timestamp")
+
+
+def aggregate_line_results(results, time_index):
+    line_results = results[ComponentType.line]
+    line_ids = line_results[0]["id"]
+
+    rows = []
+    for line_index, line_id in enumerate(line_ids):
+        loading = line_results["loading"][:, line_index]
+        max_idx = np.argmax(loading)
+        min_idx = np.argmin(loading)
+        loss_w = line_results["p_from"][:, line_index] + line_results["p_to"][:, line_index]
+        hours = (time_index - time_index[0]).total_seconds() / 3600
+        energy_loss_kwh = np.trapezoid(loss_w, hours) / 1000
+        rows.append(
+            {
+                "line_id": line_id,
+                "max_loading_pu": loading[max_idx],
+                "max_loading_timestamp": time_index[max_idx],
+                "min_loading_pu": loading[min_idx],
+                "min_loading_timestamp": time_index[min_idx],
+                "energy_loss_kwh": energy_loss_kwh,
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("line_id")
+    # print(line_ids)
