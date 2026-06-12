@@ -9,10 +9,6 @@ from power_system_simulation.LV_grid_analysis import LVGridAnalysis
 # --------------------------------------------------
 
 def mock_run_time_series_power_flow(grid, load_p, load_q):
-    """
-    Fake power flow results so tests don't depend on PGM.
-    """
-
     time_index = load_p.index
 
     voltage_table = pd.DataFrame({
@@ -46,7 +42,7 @@ def sample_grid():
             {"id": 1, "from_node": 0, "to_node": 1, "from_status": 1, "to_status": 1},
             {"id": 2, "from_node": 1, "to_node": 2, "from_status": 1, "to_status": 1},
             {"id": 3, "from_node": 1, "to_node": 3, "from_status": 1, "to_status": 1},
-            {"id": 4, "from_node": 3, "to_node": 4, "from_status": 0, "to_status": 0},  # backup line
+            {"id": 4, "from_node": 3, "to_node": 4, "from_status": 0, "to_status": 0},
         ],
         "sources": [{"node": 0}],
         "transformers": [{"id": 10, "tap_position": 0}],
@@ -79,6 +75,15 @@ def profiles():
 # 1. INPUT VALIDATION
 # --------------------------------------------------
 
+def test_invalid_transformer(sample_grid, profiles):
+    load_p, load_q, ev = profiles
+
+    sample_grid["transformers"] = []  # invalid
+
+    with pytest.raises(ValueError):
+        LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
+
 def test_invalid_feeder(sample_grid, profiles):
     load_p, load_q, ev = profiles
 
@@ -95,6 +100,22 @@ def test_timestamp_mismatch(sample_grid, profiles):
     with pytest.raises(ValueError):
         LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
 
+def test_invalid_source(sample_grid, profiles):
+    load_p, load_q, ev = profiles
+
+    sample_grid["sources"] = []
+
+    with pytest.raises(ValueError):
+        LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
+def test_load_id_mismatch(sample_grid, profiles):
+    load_p, load_q, ev = profiles
+
+    load_q = load_q.rename(columns={2: 999})
+
+    with pytest.raises(ValueError):
+        LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
 
 # --------------------------------------------------
 # 2. EV PENETRATION
@@ -105,9 +126,8 @@ def test_ev_penetration_changes_load(sample_grid, profiles, monkeypatch):
 
     sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
 
-    # Patch power flow
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
@@ -122,7 +142,7 @@ def test_ev_reproducibility(sample_grid, profiles, monkeypatch):
     load_p, load_q, ev = profiles
 
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
@@ -133,6 +153,29 @@ def test_ev_reproducibility(sample_grid, profiles, monkeypatch):
     res2 = sim2.apply_ev_penetration(0.5, seed=42)
 
     assert res1[0].equals(res2[0])
+
+def test_ev_pool_too_small(sample_grid, profiles):
+    load_p, load_q, ev = profiles
+
+    ev = ev.iloc[:, :1]  # too few
+
+    with pytest.raises(ValueError):
+        LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
+def test_full_ev_penetration(sample_grid, profiles, monkeypatch):
+    load_p, load_q, ev = profiles
+
+    sim = LVGridAnalysis(sample_grid, [1], load_p.copy(), load_q, ev)
+
+    monkeypatch.setattr(
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
+        mock_run_time_series_power_flow
+    )
+
+    sim.apply_ev_penetration(1.0)
+
+    # All loads should increase
+    assert sim.load_p.sum().sum() > load_p.sum().sum()
 
 
 # --------------------------------------------------
@@ -145,7 +188,7 @@ def test_optimize_tap(sample_grid, profiles, monkeypatch):
     sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
 
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
@@ -162,6 +205,20 @@ def test_invalid_tap_criterion(sample_grid, profiles):
     with pytest.raises(ValueError):
         sim.optimize_tap(range(-2, 3), criterion="invalid")
 
+def test_optimize_tap_voltage(sample_grid, profiles, monkeypatch):
+    load_p, load_q, ev = profiles
+
+    sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
+    monkeypatch.setattr(
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
+        mock_run_time_series_power_flow
+    )
+
+    result = sim.optimize_tap(range(-2, 3), criterion="voltage")
+
+    assert result in range(-2, 3)
+
 
 # --------------------------------------------------
 # 4. N-1 ANALYSIS
@@ -173,7 +230,7 @@ def test_n_minus_1(sample_grid, profiles, monkeypatch):
     sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
 
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
@@ -185,7 +242,7 @@ def test_n_minus_1(sample_grid, profiles, monkeypatch):
 def test_n_minus_1_empty(sample_grid, profiles, monkeypatch):
     load_p, load_q, ev = profiles
 
-    # Remove backup lines
+    # Make all lines enabled → no alternatives
     for line in sample_grid["lines"]:
         line["from_status"] = 1
         line["to_status"] = 1
@@ -193,13 +250,21 @@ def test_n_minus_1_empty(sample_grid, profiles, monkeypatch):
     sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
 
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
     df = sim.n_minus_1(1)
 
-    assert df.empty  # REQUIRED by assignment
+    assert df.empty
+
+def test_n_minus_1_invalid_edge(sample_grid, profiles):
+    load_p, load_q, ev = profiles
+
+    sim = LVGridAnalysis(sample_grid, [1], load_p, load_q, ev)
+
+    with pytest.raises(Exception):  # noqa: B017
+        sim.n_minus_1(999)
 
 
 # --------------------------------------------------
@@ -212,7 +277,7 @@ def test_zero_ev(sample_grid, profiles, monkeypatch):
     sim = LVGridAnalysis(sample_grid, [1], load_p.copy(), load_q, ev)
 
     monkeypatch.setattr(
-        "assignment3.run_time_series_power_flow",
+        "power_system_simulation.LV_grid_analysis.run_time_series_power_flow",
         mock_run_time_series_power_flow
     )
 
