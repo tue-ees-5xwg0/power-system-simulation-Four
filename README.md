@@ -47,3 +47,24 @@ The folder structure of the repository is explained as below.
 * [`example`](./example) contains the example notebook. You should modify the notebook for your presentation.
 * [`.vscode`](./.vscode) contains the setting file for the IDE VSCode.
 * [`.github/workflows`](./.github/workflows) contains the continuous integration (CI) configurations.
+
+## Graph processing
+
+`GraphProcessor` uses a table with one row per edge. This avoids keeping edge
+IDs, endpoints, and statuses aligned across separate lists.
+
+```python
+import pandas as pd
+
+from power_system_simulation.graph_processing import GraphProcessor
+
+edge_table = pd.DataFrame(
+    {
+        "edge_id": [1, 2, 3],
+        "from_vertex": [0, 1, 0],
+        "to_vertex": [1, 2, 2],
+        "enabled": [True, True, False],
+    }
+)
+graph = GraphProcessor(edge_table, source_vertex_id=0)
+```
