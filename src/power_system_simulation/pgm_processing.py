@@ -2,21 +2,43 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-try:
-    from power_grid_model import ComponentType, PowerGridModel
-    from power_grid_model.utils import json_deserialize
-except ImportError:
-    from .power_grid_model import ComponentType, PowerGridModel
-    from .power_grid_model.utils import json_deserialize
+from power_grid_model import ComponentType, PowerGridModel
+from power_grid_model.utils import json_deserialize
+from power_grid_model.validation import errors_to_string, validate_batch_data, validate_input_data
 
 
-def read_pgm_json(file_path):
-    data = Path(file_path).read_text()
-    return json_deserialize(data)
+class InputDataValidationError(ValueError):
+    pass
+
+
+class BatchDataValidationError(ValueError):
+    pass
+
+
+class ProfileTimestampMismatchError(ValueError):
+    pass
+
+
+class ProfileLoadIDMismatchError(ValueError):
+    pass
+
+
+class TimeIndexLengthError(ValueError):
+    pass
+
+
+def read_json_file(file_path):
+    return Path(file_path).read_text()
+
+
+def deserialize_pgm_json(json_data):
+    return json_deserialize(json_data)
 
 
 def create_pgm(input_data):
+    errors = validate_input_data(input_data)
+    if errors:
+        raise InputDataValidationError(errors_to_string(errors, name="input data", details=True))
     return PowerGridModel(input_data)
 
 
@@ -26,9 +48,9 @@ def read_load_profile(file_path):
 
 def validate_load_profile(active_profile, reactive_profile):
     if not active_profile.index.equals(reactive_profile.index):
-        raise ValueError("Active and reactive profiles must have the same index.")
+        raise ProfileTimestampMismatchError("Active and reactive profiles have different timestamps.")
     if not active_profile.columns.equals(reactive_profile.columns):
-        raise ValueError("Active and reactive profiles must have the same columns.")
+        raise ProfileLoadIDMismatchError("Active and reactive profiles have different load IDs.")
 
 
 def create_load_batch_update(active_profile, reactive_profile):
@@ -48,12 +70,18 @@ def create_load_batch_update(active_profile, reactive_profile):
     }
 
 
-def run_batch_power_flow(model, batch_update):
+def run_batch_power_flow(input_data, batch_update):
+    errors = validate_batch_data(input_data, batch_update)
+    if errors:
+        raise BatchDataValidationError(errors_to_string(errors, name="batch update", details=True))
+    model = PowerGridModel(input_data)
     return model.calculate_power_flow(update_data=batch_update)
 
 
 def aggregate_node_voltage_results(results, time_index):
     node_results = results[ComponentType.node]
+    if len(node_results) != len(time_index):
+        raise TimeIndexLengthError("The number of timestamps does not match the number of result batches.")
 
     rows = []
     for i, timestamp in enumerate(time_index):
@@ -77,6 +105,9 @@ def aggregate_node_voltage_results(results, time_index):
 
 def aggregate_line_results(results, time_index):
     line_results = results[ComponentType.line]
+    if len(line_results) != len(time_index):
+        raise TimeIndexLengthError("The number of timestamps does not match the number of result batches.")
+
     line_ids = line_results[0]["id"]
 
     rows = []
@@ -99,4 +130,3 @@ def aggregate_line_results(results, time_index):
         )
 
     return pd.DataFrame(rows).set_index("line_id")
-    # print(line_ids)
