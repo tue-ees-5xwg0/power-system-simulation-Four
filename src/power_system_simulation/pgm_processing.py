@@ -57,7 +57,7 @@ def create_load_batch_update(active_profile, reactive_profile):
     validate_load_profile(active_profile, reactive_profile)
 
     load_ids = np.tile(
-        active_profile.columns.to_numpy(),
+        active_profile.columns.to_numpy(dtype=np.int32),
         (len(active_profile), 1),
     )
 

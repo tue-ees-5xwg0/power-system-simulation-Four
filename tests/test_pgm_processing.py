@@ -96,6 +96,7 @@ def test_create_load_batch_update(input_data, load_profiles):
     batch_update = create_load_batch_update(active_profile, reactive_profile)
 
     assert validate_batch_data(input_data, batch_update) is None
+    assert batch_update[ComponentType.sym_load]["id"].dtype == np.int32
     assert batch_update[ComponentType.sym_load]["id"][0].tolist() == active_profile.columns.tolist()
     np.testing.assert_array_equal(batch_update[ComponentType.sym_load]["p_specified"], active_profile.to_numpy())
     np.testing.assert_array_equal(batch_update[ComponentType.sym_load]["q_specified"], reactive_profile.to_numpy())
