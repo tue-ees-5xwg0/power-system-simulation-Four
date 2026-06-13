@@ -47,10 +47,16 @@ def read_load_profile(file_path):
 
 
 def validate_load_profile(active_profile, reactive_profile):
+    if active_profile.empty or reactive_profile.empty:
+        raise ValueError("Load profiles cannot be empty.")
     if not active_profile.index.equals(reactive_profile.index):
         raise ProfileTimestampMismatchError("Active and reactive profiles have different timestamps.")
+    if not active_profile.index.is_unique or not active_profile.index.is_monotonic_increasing:
+        raise ProfileTimestampMismatchError("Load profile timestamps must be unique and sorted.")
     if not active_profile.columns.equals(reactive_profile.columns):
         raise ProfileLoadIDMismatchError("Active and reactive profiles have different load IDs.")
+    if not active_profile.columns.is_unique:
+        raise ProfileLoadIDMismatchError("Load profile IDs must be unique.")
 
 
 def create_load_batch_update(active_profile, reactive_profile):

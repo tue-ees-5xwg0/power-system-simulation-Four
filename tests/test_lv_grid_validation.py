@@ -1,7 +1,8 @@
 import copy
 
+import numpy as np
 import pytest
-from power_grid_model import ComponentType
+from power_grid_model import ComponentType, DatasetType, initialize_array
 
 from power_system_simulation.graph_processing import GraphCycleError, GraphNotFullyConnectedError
 from power_system_simulation.lv_grid_validation import (
@@ -60,6 +61,17 @@ def test_grid_must_be_connected_and_without_cycles(lv_grid):
         validate_grid(cyclic_grid)
 
 
+def test_grid_rejects_disconnected_lv_node(lv_grid):
+    disconnected_grid = copy.deepcopy(lv_grid)
+    extra_node = initialize_array(DatasetType.input, ComponentType.node, 1)
+    extra_node["id"] = 99
+    extra_node["u_rated"] = 400
+    disconnected_grid[ComponentType.node] = np.concatenate([disconnected_grid[ComponentType.node], extra_node])
+
+    with pytest.raises(GraphNotFullyConnectedError):
+        validate_grid(disconnected_grid)
+
+
 def test_feeder_validation(lv_grid):
     validate_feeders(lv_grid, [4, 5])
 
@@ -69,6 +81,8 @@ def test_feeder_validation(lv_grid):
         validate_feeders(lv_grid, [999])
     with pytest.raises(ValueError, match="transformer"):
         validate_feeders(lv_grid, [8])
+    with pytest.raises(ValueError, match="unique"):
+        validate_feeders(lv_grid, [4, 4])
 
 
 def test_load_profile_validation(lv_grid, lv_profiles):
@@ -92,3 +106,7 @@ def test_ev_profile_validation(lv_grid, lv_profiles):
         validate_ev_profiles(lv_grid, load_p, ev_profiles.shift(freq="h"))
     with pytest.raises(ValueError, match="at least one"):
         validate_ev_profiles(lv_grid, load_p, ev_profiles.iloc[:, :1])
+
+    duplicate_profiles = ev_profiles.rename(columns={"ev_b": "ev_a"})
+    with pytest.raises(ValueError, match="unique"):
+        validate_ev_profiles(lv_grid, load_p, duplicate_profiles)
