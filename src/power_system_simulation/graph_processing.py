@@ -1,10 +1,7 @@
-"""
-This is a skeleton for the graph processing assignment.
-
-We define a graph processor class with some function skeletons.
-"""
+"""Functions for finding downstream vertices and alternative edges."""
 
 import networkx as nx
+import pandas as pd
 
 
 class IDNotFoundError(Exception):
@@ -31,6 +28,10 @@ class EdgeAlreadyDisabledError(Exception):
     pass
 
 
+class InvalidEdgeTableError(ValueError):
+    pass
+
+
 class GraphProcessor:
     """
     Processes an undirected graph where enabled edges must form a spanning tree
@@ -41,47 +42,44 @@ class GraphProcessor:
     - find_alternative_edges: disabled edges that can replace a given enabled edge.
     """
 
+    EDGE_COLUMNS = ("edge_id", "from_vertex", "to_vertex", "enabled")
+
     def __init__(
         self,
-        vertex_ids: list[int],
-        edge_ids: list[int],
-        edge_vertex_id_pairs: list[tuple[int, int]],
-        edge_enabled: list[bool],
+        edge_table: pd.DataFrame,
         source_vertex_id: int,
+        vertex_ids: list[int] | None = None,
     ) -> None:
-        """
-        Initialize a graph processor object with an undirected graph.
-        Only the edges which are enabled are taken into account.
-        Check if the input is valid and raise exceptions if not.
-        The following conditions should be checked:
-            1. vertex_ids and edge_ids should be unique. (IDNotUniqueError)
-            2. edge_vertex_id_pairs should have the same length as edge_ids. (InputLengthDoesNotMatchError)
-            3. edge_vertex_id_pairs should contain valid vertex ids. (IDNotFoundError)
-            4. edge_enabled should have the same length as edge_ids. (InputLengthDoesNotMatchError)
-            5. source_vertex_id should be a valid vertex id. (IDNotFoundError)
-            6. The graph should be fully connected. (GraphNotFullyConnectedError)
-            7. The graph should not contain cycles. (GraphCycleError)
-        If one certain condition is not satisfied, the error in the parentheses should be raised.
+        """Initialize an undirected graph from a table with one row per edge."""
+        if not isinstance(edge_table, pd.DataFrame):
+            raise InvalidEdgeTableError("edge_table must be a pandas DataFrame.")
 
-        Args:
-            vertex_ids: list of vertex ids
-            edge_ids: liest of edge ids
-            edge_vertex_id_pairs: list of tuples of two integer
-                Each tuple is a vertex id pair of the edge.
-            edge_enabled: list of bools indicating of an edge is enabled or not
-            source_vertex_id: vertex id of the source in the graph
-        """
-        if len(vertex_ids) != len(set(vertex_ids)):
-            raise IDNotUniqueError("Duplicate vertex IDs.")
+        missing_columns = set(self.EDGE_COLUMNS) - set(edge_table.columns)
+        if missing_columns:
+            missing = ", ".join(sorted(missing_columns))
+            raise InvalidEdgeTableError(f"edge_table is missing required columns: {missing}.")
+
+        self.edge_table = edge_table.loc[:, self.EDGE_COLUMNS].copy()
+        if self.edge_table.isna().any().any():
+            raise InvalidEdgeTableError("edge_table cannot contain missing values.")
+        if not self.edge_table.empty and not pd.api.types.is_bool_dtype(self.edge_table["enabled"]):
+            raise InvalidEdgeTableError("The enabled column must contain boolean values.")
+
+        edge_ids = self.edge_table["edge_id"].tolist()
         if len(edge_ids) != len(set(edge_ids)):
             raise IDNotUniqueError("Duplicate edge IDs.")
 
-        if len(edge_vertex_id_pairs) != len(edge_ids):
-            raise InputLengthDoesNotMatchError("edge_vertex_id_pairs length mismatch.")
-        if len(edge_enabled) != len(edge_ids):
-            raise InputLengthDoesNotMatchError("edge_enabled length mismatch.")
+        if vertex_ids is None:
+            vertex_ids = list(
+                dict.fromkeys(self.edge_table["from_vertex"].tolist() + self.edge_table["to_vertex"].tolist())
+            )
+        elif len(vertex_ids) != len(set(vertex_ids)):
+            raise IDNotUniqueError("Duplicate vertex IDs.")
 
         vertex_set = set(vertex_ids)
+        edge_vertex_id_pairs = list(
+            self.edge_table.loc[:, ["from_vertex", "to_vertex"]].itertuples(index=False, name=None)
+        )
         for u, v in edge_vertex_id_pairs:
             if u not in vertex_set or v not in vertex_set:
                 raise IDNotFoundError("Edge references unknown vertex.")
@@ -90,20 +88,24 @@ class GraphProcessor:
             raise IDNotFoundError("Invalid source_vertex_id.")
 
         self.source = source_vertex_id
-        self.edge_pairs = dict(zip(edge_ids, edge_vertex_id_pairs, strict=False))
-        self.edge_enabled = dict(zip(edge_ids, edge_enabled, strict=False))
+        self.edge_pairs = dict(zip(edge_ids, edge_vertex_id_pairs, strict=True))
+        self.edge_enabled = dict(zip(edge_ids, self.edge_table["enabled"], strict=True))
 
         # Build graph with only enabled edges
         self._graph = nx.Graph()
         self._graph.add_nodes_from(vertex_ids)
-        for eid, (u, v), en in zip(edge_ids, edge_vertex_id_pairs, edge_enabled, strict=False):
+        enabled_edge_count = 0
+        for eid, (u, v), en in zip(edge_ids, edge_vertex_id_pairs, self.edge_table["enabled"], strict=True):
             if en:
+                enabled_edge_count += 1
                 self._graph.add_edge(u, v, edge_id=eid)
 
         if not nx.is_connected(self._graph):
             raise GraphNotFullyConnectedError("Graph is not fully connected.")
-        if not nx.is_tree(self._graph):
+        if enabled_edge_count != len(vertex_ids) - 1:
             raise GraphCycleError("Graph contains a cycle.")
+
+        self._tree = nx.bfs_tree(self._graph, self.source)
 
     def find_downstream_vertices(self, edge_id: int) -> list[int]:
         """
@@ -135,11 +137,8 @@ class GraphProcessor:
             return []
 
         u, v = self.edge_pairs[edge_id]
-        tree = nx.bfs_tree(self._graph, self.source)
-
-        # The downstream vertex is the one whose parent is the other
-        downstream = v if tree.has_edge(u, v) else u
-        return [downstream] + list(nx.descendants(tree, downstream))
+        downstream = v if self._tree.has_edge(u, v) else u
+        return [downstream] + list(nx.descendants(self._tree, downstream))
 
     def find_alternative_edges(self, disabled_edge_id: int) -> list[int]:
         """
@@ -181,16 +180,10 @@ class GraphProcessor:
         if not self.edge_enabled[disabled_edge_id]:
             raise EdgeAlreadyDisabledError(f"Edge {disabled_edge_id} is already disabled.")
 
-        u, v = self.edge_pairs[disabled_edge_id]
-        temp = self._graph.copy()
-        temp.remove_edge(u, v)
-
-        comp_source = nx.node_connected_component(temp, self.source)
-        comp_other = set(temp.nodes) - comp_source
+        downstream_vertices = set(self.find_downstream_vertices(disabled_edge_id))
 
         return [
-            eid
-            for eid, (a, b) in self.edge_pairs.items()
-            if not self.edge_enabled[eid]
-            and ((a in comp_source and b in comp_other) or (a in comp_other and b in comp_source))
+            edge_id
+            for edge_id, (u, v) in self.edge_pairs.items()
+            if not self.edge_enabled[edge_id] and ((u in downstream_vertices) != (v in downstream_vertices))
         ]
