@@ -7,6 +7,11 @@ from .pgm_processing import create_pgm, validate_load_profile
 
 def create_line_graph(grid):
     lines = grid[ComponentType.line]
+    nodes = grid[ComponentType.node]
+    transformer_to_node = grid[ComponentType.transformer]["to_node"][0]
+    lv_voltage = nodes[nodes["id"] == transformer_to_node]["u_rated"][0]
+    lv_node_ids = nodes[nodes["u_rated"] == lv_voltage]["id"].tolist()
+
     edge_table = pd.DataFrame(
         {
             "edge_id": lines["id"],
@@ -15,8 +20,7 @@ def create_line_graph(grid):
             "enabled": (lines["from_status"] == 1) & (lines["to_status"] == 1),
         }
     )
-    source_node = grid[ComponentType.transformer]["to_node"][0]
-    return GraphProcessor(edge_table, source_vertex_id=source_node)
+    return GraphProcessor(edge_table, source_vertex_id=transformer_to_node, vertex_ids=lv_node_ids)
 
 
 def validate_grid(grid):
@@ -42,6 +46,8 @@ def validate_grid(grid):
 def validate_feeders(grid, feeder_ids):
     if not feeder_ids:
         raise ValueError("At least one feeder ID is required.")
+    if len(feeder_ids) != len(set(feeder_ids)):
+        raise ValueError("Feeder IDs must be unique.")
 
     lines = grid[ComponentType.line]
     line_ids = set(lines["id"].tolist())
@@ -66,5 +72,7 @@ def validate_load_profiles(grid, load_p, load_q):
 def validate_ev_profiles(grid, load_p, ev_profiles):
     if not ev_profiles.index.equals(load_p.index):
         raise ValueError("EV profiles must have the same timestamps as the load profiles.")
+    if not ev_profiles.columns.is_unique:
+        raise ValueError("EV profile IDs must be unique.")
     if ev_profiles.shape[1] < len(grid[ComponentType.sym_load]):
         raise ValueError("There must be at least one EV profile per sym_load.")

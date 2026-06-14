@@ -90,6 +90,30 @@ def test_validate_load_profile_mismatching_load_ids(load_profiles):
         validate_load_profile(active_profile, reactive_profile)
 
 
+def test_validate_load_profile_rejects_duplicate_ids(load_profiles):
+    active_profile, reactive_profile = load_profiles
+    active_profile = active_profile.rename(columns={active_profile.columns[1]: active_profile.columns[0]})
+    reactive_profile = reactive_profile.rename(columns={reactive_profile.columns[1]: reactive_profile.columns[0]})
+
+    with pytest.raises(ProfileLoadIDMismatchError, match="unique"):
+        validate_load_profile(active_profile, reactive_profile)
+
+
+def test_validate_load_profile_rejects_empty_or_unsorted_profiles(load_profiles):
+    active_profile, reactive_profile = load_profiles
+
+    with pytest.raises(ValueError, match="empty"):
+        validate_load_profile(active_profile.iloc[:0], reactive_profile.iloc[:0])
+
+    with pytest.raises(ProfileTimestampMismatchError, match="sorted"):
+        validate_load_profile(active_profile.iloc[::-1], reactive_profile.iloc[::-1])
+
+    duplicate_active = active_profile.iloc[[0, 0]]
+    duplicate_reactive = reactive_profile.iloc[[0, 0]]
+    with pytest.raises(ProfileTimestampMismatchError, match="unique"):
+        validate_load_profile(duplicate_active, duplicate_reactive)
+
+
 def test_create_load_batch_update(input_data, load_profiles):
     active_profile, reactive_profile = load_profiles
 
