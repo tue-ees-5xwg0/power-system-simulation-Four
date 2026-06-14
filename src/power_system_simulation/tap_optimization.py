@@ -30,7 +30,9 @@ def optimize_tap_position(grid, load_p, load_q, criterion="loss"):
             value = line_table["energy_loss_kwh"].sum()
         else:
             node_voltages = results[ComponentType.node]["u_pu"]
-            value = np.mean(np.abs(node_voltages - 1))
+            max_deviation = np.abs(node_voltages.max(axis=0) - 1)
+            min_deviation = np.abs(node_voltages.min(axis=0) - 1)
+            value = np.mean((max_deviation + min_deviation) / 2)
 
         if value < best_value:
             best_value = value
