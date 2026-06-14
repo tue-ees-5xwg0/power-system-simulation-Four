@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 from power_grid_model import ComponentType
@@ -37,3 +38,20 @@ def test_tap_optimization_selects_lowest_loss(monkeypatch, lv_grid, lv_profiles)
     monkeypatch.setattr(tap_optimization, "aggregate_line_results", fake_aggregation)
 
     assert optimize_tap_position(lv_grid, load_p, load_q, "loss") == 0
+
+
+def test_tap_optimization_uses_maximum_and_minimum_voltage(monkeypatch, lv_grid, lv_profiles):
+    load_p, load_q, _ = lv_profiles
+    voltages = {
+        -1: [[1.00, 1.00]] * 9 + [[0.80, 0.80]],
+        0: [[0.94, 0.94], [1.06, 1.06]] * 5,
+        1: [[0.90, 0.90], [1.10, 1.10]] * 5,
+    }
+
+    def fake_power_flow(grid, batch_update):
+        tap_position = grid[ComponentType.transformer]["tap_pos"][0]
+        return {ComponentType.node: {"u_pu": np.array(voltages[tap_position])}}
+
+    monkeypatch.setattr(tap_optimization, "run_batch_power_flow", fake_power_flow)
+
+    assert optimize_tap_position(lv_grid, load_p, load_q, "voltage") == 0
