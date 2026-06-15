@@ -37,7 +37,8 @@ lint = [
   'ruff'
 ]
 example = [
-  'ipykernel'
+  'ipykernel',
+  'matplotlib'
 ]
 dev = [
   {include-group = "test"},
